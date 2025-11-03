@@ -75,13 +75,14 @@ function GetterSetter() {
 
       let paramPrefix = 'siL';
       let useReference = false;
-      const prefixMatch = varName.match(/^([^m]*)m/);
+      const prefixMatch = varName.match(/^m[a-zA-Z](ull|ul|ld|ui|us|uc|sc|s|i|l|f|d|b|c)_/);
 
       if (prefixMatch && prefixMatch[1]) {
         const prefix = prefixMatch[1];
         switch (prefix) {
           case 'b': paramPrefix = 'bL'; break;
           case 'c': paramPrefix = 'cL'; break;
+           case 'sc': paramPrefix = 'scL'; break;
           case 's':
             if (varName.startsWith('mcS_')) {
               paramPrefix = 'SL';
@@ -98,7 +99,6 @@ function GetterSetter() {
           case 'ui': paramPrefix = 'uiL'; break;
           case 'us': paramPrefix = 'usL'; break;
           case 'uc': paramPrefix = 'ucL'; break;
-          case 'sc': paramPrefix = 'scL'; break;
           default: paramPrefix = 'CL'; useReference = true;
         }
       }
@@ -119,7 +119,12 @@ function GetterSetter() {
         if (dataType.includes('bool')) {
           block += `${inlineText}bool ${scope}mcfn_get${capitalized}() {return ${varName}; }\n`;
           block += `${inlineText}void ${scope}mcfn_set${capitalized}(bool ${paramPrefix}_${capitalized}) {${varName} = ${paramPrefix}_${capitalized}; }\n\n`;
-        } else if (dataType.includes('string')) {
+        }else if(dataType.includes('char'))
+        {
+            block += `${inlineText}char ${scope}mcfn_get${capitalized}() {return ${varName}; }\n`;
+            block += `${inlineText}void ${scope}mcfn_set${capitalized}(char ${paramPrefix}_${capitalized}) {${varName} = ${paramPrefix}_${capitalized}; }\n\n`;
+        }
+         else if (dataType.includes('string')) {
           block += `${inlineText}string ${scope}mcfn_get${capitalized}() {return ${varName}; }\n`;
           block += `${inlineText}void ${scope}mcfn_set${capitalized}(string &${paramPrefix}_${capitalized}) {${varName} = ${paramPrefix}_${capitalized}; }\n\n`;
         }
