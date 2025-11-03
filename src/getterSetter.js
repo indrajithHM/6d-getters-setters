@@ -221,6 +221,7 @@ function GetterSetter() {
         )}
 
         {/* Inline Section */}
+        {inlineCode && (
         <div className="output-section">
           <div className="output-header">
             <h2>Inline (with ClassName::)</h2>
@@ -244,7 +245,7 @@ function GetterSetter() {
               </pre>
             )
           )}
-        </div>
+        </div>)}
         <div className="info-section"> 
             <h3>Supported Data Types:</h3>
              <ul> 
