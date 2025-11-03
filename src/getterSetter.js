@@ -257,7 +257,7 @@ function GetterSetter() {
                 <p>The generator extracts names after the last underscore:</p> 
                 <ul> 
                     <li>
-                        <code>int mcsi_Magi;</code> → <code>mcfn_getMagi(){"return mcsi_Magi;"}</code> / <code>mcfn_setMagi(int siL_Magi){"mcsi_Magi = siL_Magi;"}</code>
+                        <code>int mcsi_Magi;</code> → <code>mcfn_getMagi()</code> / <code>mcfn_setMagi(int siL_Magi)</code>
                         </li>
                          </ul>
         </div>
