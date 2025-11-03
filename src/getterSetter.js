@@ -180,7 +180,7 @@ function GetterSetter() {
 
         {/* Class Name Input */}
         <div className="input-section">
-          <label htmlFor="classname">Class Name (optional):</label>
+          <label htmlFor="classname">Class Name (optional) for Inline : </label>
           <input
             id="classname"
             type="text"
