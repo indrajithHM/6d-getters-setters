@@ -163,7 +163,7 @@ function GetterSetter() {
             type="text"
             value={className}
             onChange={(e) => setClassName(e.target.value)}
-            placeholder="Enter class name (optional)"
+            placeholder="Enter class name (optional) : e.g CHello"
           />
         </div>
 
