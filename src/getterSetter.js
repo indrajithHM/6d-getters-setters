@@ -33,16 +33,38 @@ function GetterSetter() {
       const trimmedLine = line.trim();
       const standardMatch = trimmedLine.match(/(\w+(?:\s+\w+)*)\s+(\w+);/);
       const arrayMatch = trimmedLine.match(/(\w+(?:\s+\w+)*)\s+(\w+)\[(\d+)\];/);
-
+      
       if (!standardMatch && !arrayMatch) {
         warningList.push(`⚠️ Invalid declaration: "${trimmedLine}"`);
         return;
       }
 
-      let dataType, varName;
+      let dataType, varName,arraySize;
+      
       if (arrayMatch) {
         dataType = arrayMatch[1];
         varName = arrayMatch[2];
+         arraySize = arrayMatch[3];
+
+         if(arraySize <=0)
+         {
+             warningList.push(`⚠️ Invalid declaration: "${trimmedLine}"`);
+        return;
+         }
+            const meaningfulName = extractMeaningfulName(varName);
+      const capitalized = meaningfulName.charAt(0).toUpperCase() + meaningfulName.slice(1);
+
+      // ✅ Array getter/setter logic restored here
+      normalCode += `// For ${varName}\n`;
+      normalCode += `${dataType}* mcfn_get${capitalized}() {return ${varName}; }\n`;
+      normalCode += `void mcfn_set${capitalized}(${dataType}* pscL_${capitalized}) {strcpy(${varName}, pscL_${capitalized}); }\n\n`;
+
+      if (className.trim() !== '') {
+        inlineResult += `// For ${varName}\n`;
+        inlineResult += `inline ${dataType}* ${className}::mcfn_get${capitalized}() {return ${varName}; }\n`;
+        inlineResult += `inline void ${className}::mcfn_set${capitalized}(${dataType}* pscL_${capitalized}) {strcpy(${varName}, pscL_${capitalized}); }\n\n`;
+      }
+      return; // skip normal processing
       } else {
         dataType = standardMatch[1];
         varName = standardMatch[2];
@@ -100,7 +122,8 @@ function GetterSetter() {
         } else if (dataType.includes('string')) {
           block += `${inlineText}string ${scope}mcfn_get${capitalized}() {return ${varName}; }\n`;
           block += `${inlineText}void ${scope}mcfn_set${capitalized}(string &${paramPrefix}_${capitalized}) {${varName} = ${paramPrefix}_${capitalized}; }\n\n`;
-        } else if (useReference) {
+        }
+         else if (useReference) {
           block += `${inlineText}${dataType} ${scope}mcfn_get${capitalized}() {return ${varName}; }\n`;
           block += `${inlineText}void ${scope}mcfn_set${capitalized}(${dataType} &${paramPrefix}_${capitalized}) {${varName} = ${paramPrefix}_${capitalized}; }\n\n`;
         } else {
