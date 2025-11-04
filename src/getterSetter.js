@@ -80,7 +80,7 @@ lines.forEach(line => {
   // === prefix logic ===
   let paramPrefix = 'siL';
   //let useReference = false;
-  const prefixMatch = varName.match(/^m[a-zA-Z](ull|ul|ld|ui|us|uc|sc|s|i|l|f|d|b|c)_/);
+  const prefixMatch = varName.match(/.*m[a-zA-Z](ull|ul|ld|ui|us|uc|sc|s|i|l|f|d|b|c|C)_/);
 
   if (prefixMatch && prefixMatch[1]) {
     const prefix = prefixMatch[1];
@@ -104,6 +104,7 @@ lines.forEach(line => {
       case 'ui': paramPrefix = 'uiL'; break;
       case 'us': paramPrefix = 'usL'; break;
       case 'uc': paramPrefix = 'ucL'; break;
+      case 'C' : paramPrefix = 'CL';break;
       default: paramPrefix = 'CL';// useReference = true;
     }
   }
@@ -146,8 +147,8 @@ lines.forEach(line => {
 
       if (className.trim() !== '') {
         inlineResult += `// For ${varName}\n`;
-        inlineResult += `inline ${dataType}* ${className}::mcfn_get${capitalized}() {return ${varName}; }\n`;
-        inlineResult += `inline void ${className}::mcfn_set${capitalized}(${dataType}* pscL_${capitalized}) {strcpy(${varName}, pscL_${capitalized}); }\n\n`;
+        inlineResult += `\ninline\n ${dataType}* ${className}::mcfn_get${capitalized}() {return ${varName}; }\n`;
+        inlineResult += `\ninline\n void ${className}::mcfn_set${capitalized}(${dataType}* pscL_${capitalized}) {strcpy(${varName}, pscL_${capitalized}); }\n\n`;
       }
       return;
     } else {
