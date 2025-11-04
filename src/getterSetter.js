@@ -7,6 +7,7 @@ function GetterSetter() {
   const [inputText, setInputText] = useState('');
   const [generatedCode, setGeneratedCode] = useState('');
   const [inlineCode, setInlineCode] = useState('');
+  const [initCode, setInitCode] = useState('');
   const [warnings, setWarnings] = useState([]);
   const [copied, setCopied] = useState(false);
   const [showInlineWarning, setShowInlineWarning] = useState(false);
@@ -22,6 +23,7 @@ function GetterSetter() {
     const lines = inputText.split('\n').filter(line => line.trim() !== '');
     let normalCode = '';
     let inlineResult = '';
+    let initializationResult = '';
     let warningList = [];
 
     if (lines.length === 0) {
@@ -29,122 +31,177 @@ function GetterSetter() {
       return;
     }
 
-    lines.forEach(line => {
-      const trimmedLine = line.trim();
-      const standardMatch = trimmedLine.match(/(\w+(?:\s+\w+)*)\s+(\w+);/);
-      const arrayMatch = trimmedLine.match(/(\w+(?:\s+\w+)*)\s+(\w+)\[(\d+)\];/);
-      
-      if (!standardMatch && !arrayMatch) {
-        warningList.push(`⚠️ Invalid declaration: "${trimmedLine}"`);
-        return;
-      }
 
-      let dataType, varName,arraySize;
-      
-      if (arrayMatch) {
-        dataType = arrayMatch[1];
-        varName = arrayMatch[2];
-         arraySize = arrayMatch[3];
+lines.forEach(line => {
+  const trimmedLine = line.trim();
+  if (trimmedLine === '') return;
 
-         if(arraySize <=0)
-         {
-             warningList.push(`⚠️ Invalid declaration: "${trimmedLine}"`);
-        return;
-         }
-            const meaningfulName = extractMeaningfulName(varName);
-      const capitalized = meaningfulName.charAt(0).toUpperCase() + meaningfulName.slice(1);
+  const standardMatch = trimmedLine.match(/(\w+(?:\s+\w+)*)\s+(\*?\s*\w+);/);
+  const arrayMatch = trimmedLine.match(/(\w+(?:\s+\w+)*)\s+(\*?\s*\w+)\[(\d+)\];/);
 
-      // ✅ Array getter/setter logic restored here
+  if (!standardMatch && !arrayMatch) {
+    warningList.push(`⚠️ Invalid declaration: "${trimmedLine}"`);
+    return;
+  }
+
+  let dataType = '';
+  let varName = '';
+  let arraySize = '';
+  let isPointer = false;
+
+  if (arrayMatch) {
+    dataType = (arrayMatch[1] || '').trim();
+    varName = (arrayMatch[2] || '').trim();
+    arraySize = (arrayMatch[3] || '').trim();
+
+    if (!arraySize || isNaN(Number(arraySize)) || Number(arraySize) <= 0) {
+      warningList.push(`⚠️ Invalid array size in "${trimmedLine}"`);
+      return;
+    }
+  } else if (standardMatch) {
+    dataType = (standardMatch[1] || '').trim();
+    varName = (standardMatch[2] || '').trim();
+  }
+
+  if (dataType.includes('*') || varName.startsWith('*')) {
+    isPointer = true;
+    dataType = dataType.replace('*', '').trim();
+    varName = varName.replace('*', '').trim();
+  }
+
+  if (!dataType || !varName) {
+    warningList.push(`⚠️ Could not parse declaration: "${trimmedLine}"`);
+    return;
+  }
+
+  const meaningfulName = extractMeaningfulName(varName);
+  const capitalized = meaningfulName.charAt(0).toUpperCase() + meaningfulName.slice(1);
+
+  // === prefix logic ===
+  let paramPrefix = 'siL';
+  //let useReference = false;
+  const prefixMatch = varName.match(/^m[a-zA-Z](ull|ul|ld|ui|us|uc|sc|s|i|l|f|d|b|c)_/);
+
+  if (prefixMatch && prefixMatch[1]) {
+    const prefix = prefixMatch[1];
+    switch (prefix) {
+      case 'b': paramPrefix = 'bL'; break;
+      case 'c': paramPrefix = 'cL'; break;
+      case 'sc': paramPrefix = 'scL'; break;
+      case 's':
+        if (varName.startsWith('mcS_')) {
+          paramPrefix = 'SL';
+         // useReference = true;
+        } else paramPrefix = 'siL';
+        break;
+      case 'i': paramPrefix = 'iL'; break;
+      case 'l': paramPrefix = 'slL'; break;
+      case 'f': paramPrefix = 'fL'; break;
+      case 'd': paramPrefix = 'dL'; break;
+      case 'ld': paramPrefix = 'ldL'; break;
+      case 'ull': paramPrefix = 'ullL'; break;
+      case 'ul': paramPrefix = 'ulL'; break;
+      case 'ui': paramPrefix = 'uiL'; break;
+      case 'us': paramPrefix = 'usL'; break;
+      case 'uc': paramPrefix = 'ucL'; break;
+      default: paramPrefix = 'CL';// useReference = true;
+    }
+  }
+
+  if (
+    varName.startsWith('mcS_') ||
+    !['int', 'char', 'bool', 'float', 'double', 'long', 'short', 'void', 'string'].some(t => dataType.includes(t))
+  ) {
+    //useReference = true;
+    if (varName.startsWith('mcS_')) paramPrefix = 'SL';
+  }
+
+  // 🔹 Add pointer prefix rule
+  if (isPointer) {
+    paramPrefix = 'p' + paramPrefix; // prepend 'p'
+  }
+
+  // === POINTER HANDLING ===
+  if (isPointer) {
+    normalCode += `// For ${varName}\n`;
+    normalCode += `${dataType}* mcfn_get${capitalized}() {return ${varName}; }\n`;
+    normalCode += `void mcfn_set${capitalized}(${dataType}* ${paramPrefix}_${capitalized}) {${varName} = ${paramPrefix}_${capitalized}; }\n\n`;
+    initializationResult += `${varName} = nullptr;\n`;
+
+    if (className.trim() !== '') {
+      inlineResult += `// For ${varName}\n`;
+      inlineResult += `inline ${dataType}* ${className}::mcfn_get${capitalized}() {return ${varName}; }\n`;
+      inlineResult += `inline void ${className}::mcfn_set${capitalized}(${dataType}* ${paramPrefix}_${capitalized}) {${varName} = ${paramPrefix}_${capitalized}; }\n\n`;
+    }
+    return;
+  }
+
+  // === ARRAY HANDLING ===
+  if (arrayMatch) {
+    if (dataType.includes('char')) {
       normalCode += `// For ${varName}\n`;
       normalCode += `${dataType}* mcfn_get${capitalized}() {return ${varName}; }\n`;
       normalCode += `void mcfn_set${capitalized}(${dataType}* pscL_${capitalized}) {strcpy(${varName}, pscL_${capitalized}); }\n\n`;
+      initializationResult += `memset(${varName}, 0, sizeof(${varName}));\n`;
 
       if (className.trim() !== '') {
         inlineResult += `// For ${varName}\n`;
         inlineResult += `inline ${dataType}* ${className}::mcfn_get${capitalized}() {return ${varName}; }\n`;
         inlineResult += `inline void ${className}::mcfn_set${capitalized}(${dataType}* pscL_${capitalized}) {strcpy(${varName}, pscL_${capitalized}); }\n\n`;
       }
-      return; // skip normal processing
-      } else {
-        dataType = standardMatch[1];
-        varName = standardMatch[2];
-      }
+      return;
+    } else {
+      warningList.push(`⚠️ Unsupported array type: "${trimmedLine}"`);
+      return;
+    }
+  }
 
-      const meaningfulName = extractMeaningfulName(varName);
-      const capitalized = meaningfulName.charAt(0).toUpperCase() + meaningfulName.slice(1);
+  // === NORMAL VARIABLE HANDLING ===
+  const genBlock = (inline = false) => {
+    const inlineText = inline && className ? `\ninline\n` : '';
+    const scope = inline && className ? `${className}::` : '';
+    let block = `// For ${varName}\n`;
 
-      let paramPrefix = 'siL';
-      let useReference = false;
-      const prefixMatch = varName.match(/^m[a-zA-Z](ull|ul|ld|ui|us|uc|sc|s|i|l|f|d|b|c)_/);
+    if (dataType.includes('bool')) {
+      block += `${inlineText}bool ${scope}mcfn_get${capitalized}() {return ${varName}; }\n`;
+      block += `${inlineText}void ${scope}mcfn_set${capitalized}(bool ${paramPrefix}_${capitalized}) {${varName} = ${paramPrefix}_${capitalized}; }\n\n`;
+      initializationResult += `${varName} = false;\n`;
+    } else if (dataType.includes('char')) {
+      block += `${inlineText}char ${scope}mcfn_get${capitalized}() {return ${varName}; }\n`;
+      block += `${inlineText}void ${scope}mcfn_set${capitalized}(char ${paramPrefix}_${capitalized}) {${varName} = ${paramPrefix}_${capitalized}; }\n\n`;
+      initializationResult += `${varName} = '\\0';\n`;
+    } else if (dataType.includes('string')) {
+      block += `${inlineText}string ${scope}mcfn_get${capitalized}() {return ${varName}; }\n`;
+      block += `${inlineText}void ${scope}mcfn_set${capitalized}(string &${paramPrefix}_${capitalized}) {${varName} = ${paramPrefix}_${capitalized}; }\n\n`;
+      initializationResult += `${varName} = "";\n`;
+    } else if (
+      dataType.includes('int') ||
+      dataType.includes('short') ||
+      dataType.includes('long') ||
+      dataType.includes('double') ||
+      dataType.includes('float')
+    ) {
+      block += `${inlineText}${dataType} ${scope}mcfn_get${capitalized}() {return ${varName}; }\n`;
+      block += `${inlineText}void ${scope}mcfn_set${capitalized}(${dataType} &${paramPrefix}_${capitalized}) {${varName} = ${paramPrefix}_${capitalized}; }\n\n`;
+      initializationResult += `${varName} = 0;\n`;
+    } else {
+      block += `${inlineText}${dataType} ${scope}mcfn_get${capitalized}() {return ${varName}; }\n`;
+      block += `${inlineText}void ${scope}mcfn_set${capitalized}(${dataType} &${paramPrefix}_${capitalized}) {${varName} = ${paramPrefix}_${capitalized}; }\n\n`;
+      initializationResult += `${varName} = {};\n`;
+    }
 
-      if (prefixMatch && prefixMatch[1]) {
-        const prefix = prefixMatch[1];
-        switch (prefix) {
-          case 'b': paramPrefix = 'bL'; break;
-          case 'c': paramPrefix = 'cL'; break;
-           case 'sc': paramPrefix = 'scL'; break;
-          case 's':
-            if (varName.startsWith('mcS_')) {
-              paramPrefix = 'SL';
-              useReference = true;
-            } else paramPrefix = 'siL';
-            break;
-          case 'i': paramPrefix = 'iL'; break;
-          case 'l': paramPrefix = 'slL'; break;
-          case 'f': paramPrefix = 'fL'; break;
-          case 'd': paramPrefix = 'dL'; break;
-          case 'ld': paramPrefix = 'ldL'; break;
-          case 'ull': paramPrefix = 'ullL'; break;
-          case 'ul': paramPrefix = 'ulL'; break;
-          case 'ui': paramPrefix = 'uiL'; break;
-          case 'us': paramPrefix = 'usL'; break;
-          case 'uc': paramPrefix = 'ucL'; break;
-          default: paramPrefix = 'CL'; useReference = true;
-        }
-      }
+    return block;
+  };
 
-      if (
-        varName.startsWith('mcS_') ||
-        !['int', 'char', 'bool', 'float', 'double', 'long', 'short', 'void'].some(t => dataType.includes(t))
-      ) {
-        useReference = true;
-        if (varName.startsWith('mcS_')) paramPrefix = 'SL';
-      }
+  normalCode += genBlock();
+  inlineResult += genBlock(true);
+});
 
-      const genBlock = (inline = false) => {
-        const inlineText =  inline && className ? `\ninline\n` : '';
-        const scope = inline && className ? `${className}::` : '';
-        let block = `// For ${varName}\n`;
 
-        if (dataType.includes('bool')) {
-          block += `${inlineText}bool ${scope}mcfn_get${capitalized}() {return ${varName}; }\n`;
-          block += `${inlineText}void ${scope}mcfn_set${capitalized}(bool ${paramPrefix}_${capitalized}) {${varName} = ${paramPrefix}_${capitalized}; }\n\n`;
-        }else if(dataType.includes('char'))
-        {
-            block += `${inlineText}char ${scope}mcfn_get${capitalized}() {return ${varName}; }\n`;
-            block += `${inlineText}void ${scope}mcfn_set${capitalized}(char ${paramPrefix}_${capitalized}) {${varName} = ${paramPrefix}_${capitalized}; }\n\n`;
-        }
-         else if (dataType.includes('string')) {
-          block += `${inlineText}string ${scope}mcfn_get${capitalized}() {return ${varName}; }\n`;
-          block += `${inlineText}void ${scope}mcfn_set${capitalized}(string &${paramPrefix}_${capitalized}) {${varName} = ${paramPrefix}_${capitalized}; }\n\n`;
-        }
-         else if (useReference) {
-          block += `${inlineText}${dataType} ${scope}mcfn_get${capitalized}() {return ${varName}; }\n`;
-          block += `${inlineText}void ${scope}mcfn_set${capitalized}(${dataType} &${paramPrefix}_${capitalized}) {${varName} = ${paramPrefix}_${capitalized}; }\n\n`;
-        } else {
-          block += `${inlineText}${dataType} ${scope}mcfn_get${capitalized}() {return ${varName}; }\n`;
-          block += `${inlineText}void ${scope}mcfn_set${capitalized}(${dataType} &${paramPrefix}_${capitalized}) {${varName} = ${paramPrefix}_${capitalized}; }\n\n`;
-        }
-
-        return block;
-      };
-
-      normalCode += genBlock();
-      inlineResult += genBlock(true);
-    });
 
     setWarnings(warningList);
     setGeneratedCode(normalCode);
+     setInitCode(initializationResult);
 
     if (className.trim() === '') {
       setShowInlineWarning(true);
@@ -170,6 +227,7 @@ function GetterSetter() {
     setClassName('');
     setGeneratedCode('');
     setInlineCode('');
+    setInitCode('');
     setWarnings([]);
     setShowInlineWarning(false);
     setCopied(false);
@@ -274,6 +332,24 @@ function GetterSetter() {
             )
           )}
         </div>)}
+        {/* Initialization Code Section */}
+{initCode && (
+  <div className="output-section">
+    <div className="output-header">
+      <h2>Initialization Code</h2>
+      <button
+        onClick={() => copyToClipboard(initCode)}
+        className={`copy-btn ${copied ? 'copied' : ''}`}
+      >
+        {copied ? '✓ Copied!' : 'Copy'}
+      </button>
+    </div>
+    <pre className="code-block">
+      <code>{initCode}</code>
+    </pre>
+  </div>
+)}
+
         <div className="info-section"> 
             <h3>Supported Data Types:</h3>
              <ul> 
