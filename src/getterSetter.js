@@ -130,8 +130,8 @@ lines.forEach(line => {
 
     if (className.trim() !== '') {
       inlineResult += `// For ${varName}\n`;
-      inlineResult += `inline ${dataType}* ${className}::mcfn_get${capitalized}() {return ${varName}; }\n`;
-      inlineResult += `inline void ${className}::mcfn_set${capitalized}(${dataType}* ${paramPrefix}_${capitalized}) {${varName} = ${paramPrefix}_${capitalized}; }\n\n`;
+      inlineResult += `\ninline\n ${dataType}* ${className}::mcfn_get${capitalized}() {return ${varName}; }\n`;
+      inlineResult += `\ninline\n void ${className}::mcfn_set${capitalized}(${dataType}* ${paramPrefix}_${capitalized}) {${varName} = ${paramPrefix}_${capitalized}; }\n\n`;
     }
     return;
   }
@@ -142,7 +142,7 @@ lines.forEach(line => {
       normalCode += `// For ${varName}\n`;
       normalCode += `${dataType}* mcfn_get${capitalized}() {return ${varName}; }\n`;
       normalCode += `void mcfn_set${capitalized}(${dataType}* pscL_${capitalized}) {strcpy(${varName}, pscL_${capitalized}); }\n\n`;
-      initializationResult += `memset(${varName}, 0, sizeof(${varName}));\n`;
+      initializationResult += `memset(${varName}, 0x00, sizeof(${varName}));\n`;
 
       if (className.trim() !== '') {
         inlineResult += `// For ${varName}\n`;
@@ -155,46 +155,57 @@ lines.forEach(line => {
       return;
     }
   }
+// === NORMAL VARIABLE HANDLING ===
+const genBlock = (inline = false) => {
+  const inlineText = inline && className ? `\ninline\n` : '';
+  const scope = inline && className ? `${className}::` : '';
+  let block = `// For ${varName}\n`;
 
-  // === NORMAL VARIABLE HANDLING ===
-  const genBlock = (inline = false) => {
-    const inlineText = inline && className ? `\ninline\n` : '';
-    const scope = inline && className ? `${className}::` : '';
-    let block = `// For ${varName}\n`;
+  if (dataType.includes('bool')) {
+    block += `${inlineText}bool ${scope}mcfn_get${capitalized}() {return ${varName}; }\n`;
+    block += `${inlineText}void ${scope}mcfn_set${capitalized}(bool ${paramPrefix}_${capitalized}) {${varName} = ${paramPrefix}_${capitalized}; }\n\n`;
+  } else if (dataType.includes('char')) {
+    block += `${inlineText}char ${scope}mcfn_get${capitalized}() {return ${varName}; }\n`;
+    block += `${inlineText}void ${scope}mcfn_set${capitalized}(char ${paramPrefix}_${capitalized}) {${varName} = ${paramPrefix}_${capitalized}; }\n\n`;
+  } else if (dataType.includes('string')) {
+    block += `${inlineText}string ${scope}mcfn_get${capitalized}() {return ${varName}; }\n`;
+    block += `${inlineText}void ${scope}mcfn_set${capitalized}(string &${paramPrefix}_${capitalized}) {${varName} = ${paramPrefix}_${capitalized}; }\n\n`;
+  } else if (
+    dataType.includes('int') ||
+    dataType.includes('short') ||
+    dataType.includes('long') ||
+    dataType.includes('double') ||
+    dataType.includes('float')
+  ) {
+    block += `${inlineText}${dataType} ${scope}mcfn_get${capitalized}() {return ${varName}; }\n`;
+    block += `${inlineText}void ${scope}mcfn_set${capitalized}(${dataType} &${paramPrefix}_${capitalized}) {${varName} = ${paramPrefix}_${capitalized}; }\n\n`;
+  } else {
+    block += `${inlineText}${dataType} ${scope}mcfn_get${capitalized}() {return ${varName}; }\n`;
+    block += `${inlineText}void ${scope}mcfn_set${capitalized}(${dataType} &${paramPrefix}_${capitalized}) {${varName} = ${paramPrefix}_${capitalized}; }\n\n`;
+  }
 
-    if (dataType.includes('bool')) {
-      block += `${inlineText}bool ${scope}mcfn_get${capitalized}() {return ${varName}; }\n`;
-      block += `${inlineText}void ${scope}mcfn_set${capitalized}(bool ${paramPrefix}_${capitalized}) {${varName} = ${paramPrefix}_${capitalized}; }\n\n`;
-      initializationResult += `${varName} = false;\n`;
-    } else if (dataType.includes('char')) {
-      block += `${inlineText}char ${scope}mcfn_get${capitalized}() {return ${varName}; }\n`;
-      block += `${inlineText}void ${scope}mcfn_set${capitalized}(char ${paramPrefix}_${capitalized}) {${varName} = ${paramPrefix}_${capitalized}; }\n\n`;
-      initializationResult += `${varName} = '\\0';\n`;
-    } else if (dataType.includes('string')) {
-      block += `${inlineText}string ${scope}mcfn_get${capitalized}() {return ${varName}; }\n`;
-      block += `${inlineText}void ${scope}mcfn_set${capitalized}(string &${paramPrefix}_${capitalized}) {${varName} = ${paramPrefix}_${capitalized}; }\n\n`;
-      initializationResult += `${varName} = "";\n`;
-    } else if (
-      dataType.includes('int') ||
-      dataType.includes('short') ||
-      dataType.includes('long') ||
-      dataType.includes('double') ||
-      dataType.includes('float')
-    ) {
-      block += `${inlineText}${dataType} ${scope}mcfn_get${capitalized}() {return ${varName}; }\n`;
-      block += `${inlineText}void ${scope}mcfn_set${capitalized}(${dataType} &${paramPrefix}_${capitalized}) {${varName} = ${paramPrefix}_${capitalized}; }\n\n`;
-      initializationResult += `${varName} = 0;\n`;
-    } else {
-      block += `${inlineText}${dataType} ${scope}mcfn_get${capitalized}() {return ${varName}; }\n`;
-      block += `${inlineText}void ${scope}mcfn_set${capitalized}(${dataType} &${paramPrefix}_${capitalized}) {${varName} = ${paramPrefix}_${capitalized}; }\n\n`;
-      initializationResult += `${varName} = {};\n`;
-    }
+  return block;
+};
 
-    return block;
-  };
+// ✅ Generate only once
+const generatedBlock = genBlock();
+const inlineBlock = genBlock(true);
+normalCode += generatedBlock;
+inlineResult += inlineBlock;
 
-  normalCode += genBlock();
-  inlineResult += genBlock(true);
+// ✅ Add initialization ONCE per variable
+if (isPointer) initializationResult += `${varName} = nullptr;\n`;
+else if (dataType.includes('bool')) initializationResult += `${varName} = false;\n`;
+else if (dataType.includes('char')) initializationResult += `${varName} = '\\0';\n`;
+else if (dataType.includes('string')) initializationResult += `${varName} = "";\n`;
+else if (
+  dataType.includes('int') ||
+  dataType.includes('short') ||
+  dataType.includes('long') ||
+  dataType.includes('double') ||
+  dataType.includes('float')
+) initializationResult += `${varName} = 0;\n`;
+else initializationResult += `${varName} = {};\n`;
 });
 
 
