@@ -131,8 +131,8 @@ lines.forEach(line => {
 
     if (className.trim() !== '') {
       inlineResult += `// For ${varName}\n`;
-      inlineResult += `\ninline\n ${dataType}* ${className}::mcfn_get${capitalized}() {return ${varName}; }\n`;
-      inlineResult += `\ninline\n void ${className}::mcfn_set${capitalized}(${dataType}* ${paramPrefix}_${capitalized}) {${varName} = ${paramPrefix}_${capitalized}; }\n\n`;
+      inlineResult += `inline\n ${dataType}* ${className}::mcfn_get${capitalized}() {return ${varName}; }\n`;
+      inlineResult += `inline\n void ${className}::mcfn_set${capitalized}(${dataType}* ${paramPrefix}_${capitalized}) {${varName} = ${paramPrefix}_${capitalized}; }\n\n`;
     }
     return;
   }
@@ -147,8 +147,8 @@ lines.forEach(line => {
 
       if (className.trim() !== '') {
         inlineResult += `// For ${varName}\n`;
-        inlineResult += `\ninline\n ${dataType}* ${className}::mcfn_get${capitalized}() {return ${varName}; }\n`;
-        inlineResult += `\ninline\n void ${className}::mcfn_set${capitalized}(${dataType}* pscL_${capitalized}) {strcpy(${varName}, pscL_${capitalized}); }\n\n`;
+        inlineResult += `inline\n ${dataType}* ${className}::mcfn_get${capitalized}() {return ${varName}; }\n`;
+        inlineResult += `inline\n void ${className}::mcfn_set${capitalized}(${dataType}* pscL_${capitalized}) {strcpy(${varName}, pscL_${capitalized}); }\n\n`;
       }
       return;
     } else {
@@ -158,7 +158,7 @@ lines.forEach(line => {
   }
 // === NORMAL VARIABLE HANDLING ===
 const genBlock = (inline = false) => {
-  const inlineText = inline && className ? `\ninline\n` : '';
+  const inlineText = inline && className ? `inline\n` : '';
   const scope = inline && className ? `${className}::` : '';
   let block = `// For ${varName}\n`;
 
@@ -368,6 +368,7 @@ else initializationResult += `${varName} = {};\n`;
                 <li><strong>Primitive types:</strong> int, bool, char, float, double, long double, short, long</li> 
                 <li><strong>Standard types:</strong> string</li> <li><strong>Arrays:</strong> char arrays with size</li> 
                 <li><strong>Structures:</strong> SResponse mcS_Response; (uses SL_ prefix)</li> 
+                <li><strong>Pointers:</strong> Any Kind of Pointers e.g CHello *pmeC_Hello</li> 
                 <li><strong>Custom types:</strong> Any user-defined class/struct</li> 
                 </ul> 
                 <h3>Naming Convention:</h3> 
